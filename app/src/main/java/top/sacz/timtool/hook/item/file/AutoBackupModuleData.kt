@@ -1,5 +1,7 @@
 package top.sacz.timtool.hook.item.file
 
+import android.os.Environment
+import top.sacz.timtool.hook.HookEnv
 import top.sacz.timtool.hook.base.BaseSwitchFunctionHookItem
 import top.sacz.timtool.hook.core.annotation.HookItem
 import top.sacz.timtool.hook.util.LogUtils
@@ -17,14 +19,30 @@ class AutoBackupModuleData : BaseSwitchFunctionHookItem() {
     companion object {
         private const val TAG = "AutoBackupModuleData"
         private const val CONFIG_NAME = "AutoBackup"
-        private const val MODULE_SOURCE_DIR = "/storage/emulated/0/Android/data/com.tencent.tim/Tim小助手"
-        private const val BACKUP_TARGET_DIR = "/storage/emulated/0/Download/TimTool"
     }
 
     private val config = ConfigUtils(CONFIG_NAME)
     private var isProcessing = false
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
     private val timestampFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
+
+    // 动态获取模块数据目录 /storage/emulated/0/Android/data/com.tencent.tim/Tim小助手
+    private val moduleSourceDir: String by lazy {
+        val context = HookEnv.getHostAppContext()
+        val androidDataDir = context.getExternalFilesDir(null)?.parentFile
+        if (androidDataDir != null) {
+            File(androidDataDir, "Tim小助手").absolutePath
+        } else {
+            // 使用外部存储根目录拼接
+            "${Environment.getExternalStorageDirectory().absolutePath}/Android/data/com.tencent.tim/Tim小助手"
+        }
+    }
+
+    // 动态获取备份目录 /storage/emulated/0/Download/TimTool
+    private val backupTargetDir: String by lazy {
+        val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        File(downloadDir, "TimTool").absolutePath
+    }
 
     override fun getTip(): String {
         return "每天启动TIM自动备份模块数据"
@@ -62,7 +80,7 @@ class AutoBackupModuleData : BaseSwitchFunctionHookItem() {
     }
 
     private fun ensureNoMediaFile() {
-        val backupDir = File(BACKUP_TARGET_DIR)
+        val backupDir = File(backupTargetDir)
         if (!backupDir.exists()) {
             backupDir.mkdirs()
             File(backupDir, ".nomedia").createNewFile()
@@ -70,18 +88,18 @@ class AutoBackupModuleData : BaseSwitchFunctionHookItem() {
             val noMedia = File(backupDir, ".nomedia")
             if (!noMedia.exists()) noMedia.createNewFile()
         } else {
-            throw IOException("备份路径不是目录: $BACKUP_TARGET_DIR")
+            throw IOException("备份路径不是目录: $backupTargetDir")
         }
     }
 
     private fun performBackup(): File {
-        val sourceDir = File(MODULE_SOURCE_DIR)
+        val sourceDir = File(moduleSourceDir)
         if (!sourceDir.exists() || !sourceDir.isDirectory) {
-            throw IOException("模块数据目录无效: $MODULE_SOURCE_DIR")
+            throw IOException("模块数据目录无效: $moduleSourceDir")
         }
 
         val timestamp = timestampFormat.format(Date())
-        val backupFile = File(BACKUP_TARGET_DIR, "TimToolBackup_$timestamp.zip")
+        val backupFile = File(backupTargetDir, "TimToolBackup_$timestamp.zip")
 
         FileOutputStream(backupFile).use { fos ->
             java.util.zip.ZipOutputStream(fos).use { zos ->
@@ -106,7 +124,7 @@ class AutoBackupModuleData : BaseSwitchFunctionHookItem() {
     }
 
     private fun deleteAllZipFiles() {
-        val backupDir = File(BACKUP_TARGET_DIR)
+        val backupDir = File(backupTargetDir)
         if (backupDir.exists() && backupDir.isDirectory) {
             backupDir.listFiles()?.forEach {
                 if (it.isFile && it.name.endsWith(".zip", ignoreCase = true)) {
