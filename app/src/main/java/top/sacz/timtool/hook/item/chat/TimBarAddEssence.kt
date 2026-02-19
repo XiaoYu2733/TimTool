@@ -10,7 +10,6 @@ import android.widget.ImageView
 import android.widget.RelativeLayout
 import top.sacz.timtool.hook.base.BaseSwitchFunctionHookItem
 import top.sacz.timtool.hook.core.annotation.HookItem
-import top.sacz.timtool.hook.util.ToastTool
 
 @HookItem("辅助功能/聊天/TIM群标题栏添加精华入口")
 class TimBarAddEssence : BaseSwitchFunctionHookItem() {
@@ -55,11 +54,7 @@ class TimBarAddEssence : BaseSwitchFunctionHookItem() {
                 }
 
                 iconView.setOnClickListener {
-                    val troopUin = getTroopUin(param.thisObject)
-                    if (troopUin == null) {
-                        ToastTool.error("无法获取群号")
-                        return@setOnClickListener
-                    }
+                    val troopUin = getTroopUin(param.thisObject) ?: return@setOnClickListener
                     try {
                         val browserClass = loader.loadClass("com.tencent.mobileqq.activity.QQBrowserDelegationActivity")
                         val intent = Intent(context, browserClass).apply {
@@ -71,19 +66,18 @@ class TimBarAddEssence : BaseSwitchFunctionHookItem() {
                         }
                         context.startActivity(intent)
                     } catch (e: Exception) {
-                        ToastTool.error("无法启动内置浏览器")
+                        // ignore
                     }
                 }
 
                 rootView.addView(iconView)
             }
         } catch (e: Exception) {
-            // 忽略初始化失败（静默失效）
+            // ignore
         }
     }
 
     private fun getTroopUin(instance: Any): String? {
-        // 优先尝试字段
         runCatching {
             val fields = instance.javaClass.declaredFields
             for (field in fields) {
@@ -94,7 +88,6 @@ class TimBarAddEssence : BaseSwitchFunctionHookItem() {
                 }
             }
         }
-        // 尝试 getter 方法
         runCatching {
             val methods = instance.javaClass.methods
             for (method in methods) {
